@@ -42,6 +42,7 @@ AU = 1.496e8  # Now that the analysis is near PSP spacecraft, this constant seem
 streak_number = 8  # The numbers of selected streaks in the WISPR_Inner at observing time.
 fits_file_path = '/FITS_FILE_PATH'
 psp_3d_model_path = '/3D_MODEL_PATH'
+output_file_path = '/OUTPUT_FILE_PATH'
 WISPR_pos = np.array([0.855, -0.249, -0.300], dtype=float)  # the position of WISPR onboard PSP in spacecraft frame.
 line_flag = False
 # line_flag being True indicates the streaks in WISPR_INNER are parallel to each other,
@@ -172,15 +173,20 @@ def get_vanishing_point(point_set, need_test=False):
     :return: the center point of all point input. 1 * 2 array
     The algorithm in this function is k-means (using criterion of distance minimizing)
     """
-    vanish_point, line_label, _ = cluster.k_means(point_set, n_clusters=1)
+    vanish_point, line_label, inertia = cluster.k_means(point_set, n_clusters=1)
     vanish_point = np.array(vanish_point, dtype=float)
+    if fits_data_size_flag:
+        sigma = np.sqrt(inertia / len(point_set[:, 0]) / (len(point_set[:, 0]) - 1)) * 20e-6  # unit: m
+    else:
+        sigma = np.sqrt(inertia / len(point_set[:, 0]) / (len(point_set[:, 0]) - 1)) * 10e-6  # unit: m
     if need_test is True:
         fun_fig = plt.figure()
         fun_ax = fun_fig.add_subplot(111)
         fun_ax.scatter(point_set, color='yellow')
         fun_ax.scatter(vanish_point[0], marker='x', color='black')
         plt.show()
-    return vanish_point
+    return vanish_point, sigma
+# Modifying the 'get_vanishing_point()'. Add a new parameter 'error_r' to quantify the error of impact region.  --- 2022.9.14 Chen Tianhang
 
 
 def construct_3d_psp_tps_model(epoch):
@@ -381,93 +387,107 @@ def plot_3d_trajectory(fun_center_point, line_orientation, epoch_time, the_flag)
                 legendgrouptitle=dict(text='Possible position of the cone origin')
             )
         )
+        scaling = (z_TPS - WISPR_pos[2]) / ((the_center_point_3d[2] - WISPR_pos[2]) / 8e1)
+        point_intercept_tps = ((the_center_point_3d - WISPR_pos) / 8e1) * scaling + WISPR_pos
+        project_error = error * scaling * cos_sc_wispr
+        output_file = open(output_file_path, 'a')
+        output_file.write('['+str(point_intercept_tps[0])+', '+str(point_intercept_tps[1])+', ' +
+                          str(point_intercept_tps[2]) + ', ' + timestr + ', ' + str(project_error) + ']\n')
+        output_file.close()
     return trajectory_traces
+# Modifying the function 'plot_3d_trajectory()'. Add a procedure to write a .txt output file recording messages of the impact region.
+# ---2022.9.14 Chen Tianhang.
 
 
-data, header = sunpy.io.fits.read(fits_file_path)[0]
-header['BUNIT'] = 'MSB'
-a_map = sunpy.map.Map(data, header)
-my_colormap = copy.deepcopy(a_map.cmap)
-true_data = copy.deepcopy(data)
-i = 0
-fits_data_size_flag = False
-# False means the FITS data is not compressed with a size of 2048*1920, while True with a size of 1024*960.
-# It just depends on the FITS file.
-if fits_data_size_flag:
-    scaling_factor = 2
-else:
-    scaling_factor = 1
+def main_function():
+    data, header = sunpy.io.fits.read(fits_file_path)[0]
+    header['BUNIT'] = 'MSB'
+    a_map = sunpy.map.Map(data, header)
+    my_colormap = copy.deepcopy(a_map.cmap)
+    true_data = copy.deepcopy(data)
+    i = 0
+    fits_data_size_flag = False
+    # False means the FITS data is not compressed with a size of 2048*1920, while True with a size of 1024*960.
+    # It just depends on the FITS file.
+    if fits_data_size_flag:
+        scaling_factor = 2
+    else:
+        scaling_factor = 1
 
-x_pixel_size = int(1920 / scaling_factor)
-y_pixel_size = int(2048 / scaling_factor)
+    x_pixel_size = int(1920 / scaling_factor)
+    y_pixel_size = int(2048 / scaling_factor)
 
-while i < y_pixel_size:
-    j = 0
-    while j < x_pixel_size:
-        true_data[i, j] = data[y_pixel_size-1-i, j]
-        j = j + 1
-    i = i + 1
+    while i < y_pixel_size:
+        j = 0
+        while j < x_pixel_size:
+            true_data[i, j] = data[y_pixel_size-1-i, j]
+            j = j + 1
+        i = i + 1
 
-all_line_points, slope_and_intercept = retrieve_streaks(streak_number)
-interceptions = []
-i = count = 0
-while i < streak_number:
-    j = i + 1
-    while j < streak_number:
-        temp_interp_x = (slope_and_intercept[j, 1] - slope_and_intercept[i, 1]) / (slope_and_intercept[i, 0] -
-                                                                                   slope_and_intercept[j, 0])
-        temp_interp_y = slope_and_intercept[i, 0] * temp_interp_x + slope_and_intercept[i, 1]
-        interceptions.append([temp_interp_x, temp_interp_y])
-        j = j + 1
-    i = i + 1
-interceptions = np.array(interceptions, dtype=float)
-the_center_point = get_vanishing_point(interceptions)
+    all_line_points, slope_and_intercept = retrieve_streaks(streak_number)
+    interceptions = []
+    i = count = 0
+    while i < streak_number:
+        j = i + 1
+        while j < streak_number:
+            temp_interp_x = (slope_and_intercept[j, 1] - slope_and_intercept[i, 1]) / (slope_and_intercept[i, 0] -
+                                                                                       slope_and_intercept[j, 0])
+            temp_interp_y = slope_and_intercept[i, 0] * temp_interp_x + slope_and_intercept[i, 1]
+            interceptions.append([temp_interp_x, temp_interp_y])
+            j = j + 1
+        i = i + 1
+    interceptions = np.array(interceptions, dtype=float)
+    the_center_point = get_vanishing_point(interceptions)
 
 
-f = 28e-3  # the focal length of WISPR_INNER is 28mm
-x_0_pixel = x_pixel_size / 2
-y_0_pixel = y_pixel_size / 2  # midpoint
-alpha = 1e-5 * scaling_factor
-# the size of single CCD pixel is 0.01mm
-# If the size of FITS data is half the true pixel size(2048*1920), the scaling factor 2 above is needed.
+    f = 28e-3  # the focal length of WISPR_INNER is 28mm
+    x_0_pixel = x_pixel_size / 2
+    y_0_pixel = y_pixel_size / 2  # midpoint
+    alpha = 1e-5 * scaling_factor
+    # the size of single CCD pixel is 0.01mm
+    # If the size of FITS data is half the true pixel size(2048*1920), the scaling factor 2 above is needed.
 
-phi = np.arctan((the_center_point[0, 1] - y_0_pixel) / (the_center_point[0, 0] - x_0_pixel))
-theta = np.arctan(np.cos(phi) / alpha / (the_center_point[0, 0] - x_0_pixel) * f)   # unit of phi and theta: rad
-phi_deg = phi * 180 / np.pi
-theta_deg = theta * 180 / np.pi
-orientation_vec_WISPR_I = np.zeros([3, 1], dtype=float)
-if line_flag:
-    orientation_vec_WISPR_I[0] = (all_line_points[0, 1, 0] - all_line_points[0, 0, 0]) / \
-                                 np.sqrt((all_line_points[0, 1, 0] - all_line_points[0, 0, 0]) ** 2 +
-                                         (all_line_points[0, 1, 1] - all_line_points[0, 0, 1]) ** 2)
-    orientation_vec_WISPR_I[1] = (all_line_points[0, 1, 1] - all_line_points[0, 0, 1]) / \
-                                 np.sqrt((all_line_points[0, 1, 0] - all_line_points[0, 0, 0]) ** 2 +
-                                         (all_line_points[0, 1, 1] - all_line_points[0, 0, 1]) ** 2)
-    orientation_vec_WISPR_I[2] = 0
-else:
-    orientation_vec_WISPR_I[0] = np.cos(theta) * np.cos(phi)
-    orientation_vec_WISPR_I[1] = np.cos(theta) * np.sin(phi)
-    orientation_vec_WISPR_I[2] = np.sin(theta)
-# The orientation of streaks in WISPR_INNER frame has been derived(orientation_vev_WISPR_I)
-# The next step: transfer it from WISPR_I to SPP_SPACECRAFT frame
-et, rotation_matrix = get_psp_state(header['DATE-BEG'], '%Y-%m-%dT%H:%M:%S.%f')
-orientation_vec_sc = np.dot(rotation_matrix, orientation_vec_WISPR_I)
+    phi = np.arctan((the_center_point[0, 1] - y_0_pixel) / (the_center_point[0, 0] - x_0_pixel))
+    theta = np.arctan(np.cos(phi) / alpha / (the_center_point[0, 0] - x_0_pixel) * f)   # unit of phi and theta: rad
+    phi_deg = phi * 180 / np.pi
+    theta_deg = theta * 180 / np.pi
+    orientation_vec_WISPR_I = np.zeros([3, 1], dtype=float)
+    if line_flag:
+        orientation_vec_WISPR_I[0] = (all_line_points[0, 1, 0] - all_line_points[0, 0, 0]) / \
+                                     np.sqrt((all_line_points[0, 1, 0] - all_line_points[0, 0, 0]) ** 2 +
+                                             (all_line_points[0, 1, 1] - all_line_points[0, 0, 1]) ** 2)
+        orientation_vec_WISPR_I[1] = (all_line_points[0, 1, 1] - all_line_points[0, 0, 1]) / \
+                                     np.sqrt((all_line_points[0, 1, 0] - all_line_points[0, 0, 0]) ** 2 +
+                                             (all_line_points[0, 1, 1] - all_line_points[0, 0, 1]) ** 2)
+        orientation_vec_WISPR_I[2] = 0
+    else:
+        orientation_vec_WISPR_I[0] = np.cos(theta) * np.cos(phi)
+        orientation_vec_WISPR_I[1] = np.cos(theta) * np.sin(phi)
+        orientation_vec_WISPR_I[2] = np.sin(theta)
+    # The orientation of streaks in WISPR_INNER frame has been derived(orientation_vev_WISPR_I)
+    # The next step: transfer it from WISPR_I to SPP_SPACECRAFT frame
+    et, rotation_matrix = get_psp_state(header['DATE-BEG'], '%Y-%m-%dT%H:%M:%S.%f')
+    orientation_vec_sc = np.dot(rotation_matrix, orientation_vec_WISPR_I)
 
-# Plot all.
-transfer_factor = 2.25 / 0.219372 / 2
-# the tranforming factor from the stl size to the true size of psp.
-# 2.25 is the true size of TPS diameter(smallest), while 0.219372*2 is the stl size of it.    ——Tianhang Chen, 2022.3.18
-plotly_trace_1 = add_psp_3d_model(np.zeros([3, 1], dtype=float), rot_theta=0, scale=transfer_factor)
-plotly_trace_2, plotly_trace_3 = plot_FOV_and_FrameAxes(et)
-plotly_trace_4 = plot_3d_trajectory(the_center_point, orientation_vec_sc, et, line_flag)
-plotly_fig = go.Figure()
-plotly_fig.add_trace(plotly_trace_1)
-for i in range(len(plotly_trace_2)):
-    plotly_fig.add_trace(plotly_trace_2[i])
-for i in range(len(plotly_trace_4)):
-    plotly_fig.add_trace(plotly_trace_4[i])
-for i in range(len(plotly_trace_3)):
-    plotly_fig.add_trace(plotly_trace_3[i])
-plotly_fig.update_layout(title_text="Spacecraft Frame" + ' ' + header['DATE-BEG'],
-                         title_font_size=30)
-plotly_fig.show()
+    # Plot all.
+    transfer_factor = 2.25 / 0.219372 / 2
+    # the tranforming factor from the stl size to the true size of psp.
+    # 2.25 is the true size of TPS diameter(smallest), while 0.219372*2 is the stl size of it.    ——Tianhang Chen, 2022.3.18
+    plotly_trace_1 = add_psp_3d_model(np.zeros([3, 1], dtype=float), rot_theta=0, scale=transfer_factor)
+    plotly_trace_2, plotly_trace_3 = plot_FOV_and_FrameAxes(et)
+    plotly_trace_4 = plot_3d_trajectory(the_center_point, orientation_vec_sc, et, line_flag)
+    plotly_fig = go.Figure()
+    plotly_fig.add_trace(plotly_trace_1)
+    for i in range(len(plotly_trace_2)):
+        plotly_fig.add_trace(plotly_trace_2[i])
+    for i in range(len(plotly_trace_4)):
+        plotly_fig.add_trace(plotly_trace_4[i])
+    for i in range(len(plotly_trace_3)):
+        plotly_fig.add_trace(plotly_trace_3[i])
+    plotly_fig.update_layout(title_text="Spacecraft Frame" + ' ' + header['DATE-BEG'],
+                             title_font_size=30)
+    plotly_fig.show()
+
+    
+main_function()
+    
