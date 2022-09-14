@@ -22,8 +22,8 @@ c_0 = 3e8  # the velocity of light in vacuum
 k_B = 1.38e-23  # Boltzmann constant
 R_s = 6.955e8  # the average radius of SUN.
 T_s = 5775  # the temperature of SUN is approximately 5775 K
-psp_3d_model_path = '/FITS_FILE_PATH'
-my_path = 'INPUT_path/20210112/wispr_filename'
+my_path = '/FITS_FILE_PATH'
+psp_3d_model_path = '/3D_MODEL_PATH'
 WISPR_pos = np.array([0.865, -0.249, -0.300], dtype=float)  # the position of WISPR onboard PSP in spacecraft frame.
 transfer_factor = 2.25 / 0.219372 / 2  # the factor that transfers PSP's size in .stl file to that in true case.
 generate_flag = 2  # 1 means using the generating function 'generate_par_1', 2 means 'generate_par_2'
