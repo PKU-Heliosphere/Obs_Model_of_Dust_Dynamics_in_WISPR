@@ -10,5 +10,6 @@ The format of file impact_rate.txt in every fold is:
   \+ number of those cases that streaks are approximately parallel to each other
   
   \+ number of those cases that streaks distribute randomly
+(or just the sum of these four terms)
 
 - The total exposure time of these figures.
