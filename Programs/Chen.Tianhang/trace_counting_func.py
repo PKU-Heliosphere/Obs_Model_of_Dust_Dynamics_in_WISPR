@@ -53,8 +53,7 @@ def get_centroid(data_point, need_test=False):
     return vanish_point
 
 
-def get_point_slope(line_number, the_path='D://Microsoft Download/Formal Files/data file/FITS/WISPR_ENC07_L3_FITS/\
-20210112/psp_L3_wispr_20210112T030017_V1_1221.fits'):
+def get_point_slope(line_number, the_path='INPUT_path'):
     """
     NOTE: 取点顺序一定要从左到右
     :param line_number: the number of the traces gotten from the WISPR-INNER map.
@@ -317,8 +316,8 @@ def width_calc(data_array, point_set, line_number):
 
 
 def write_txt(my_time, trace_number, point_set, intensities):
-    filedir_path = 'D://Microsoft Download/Formal Files/data file/TXT_or_XLS/WISPR dust traces/'
-    temp_file = open('D://Microsoft Download/Formal Files/data file/TXT_or_XLS/WISPR dust traces/1.txt', mode='w+')
+    filedir_path = 'OUTPUT_folder_path'
+    temp_file = open(filedir_path+'filename', mode='w+')
     temp_file.write('The observing time of the WISPR map is(beginning time):\n' + my_time)
     temp_file.write('\n\n')
     temp_file.write('Number of traces is:      ' + str(trace_number) + '\n\n')
