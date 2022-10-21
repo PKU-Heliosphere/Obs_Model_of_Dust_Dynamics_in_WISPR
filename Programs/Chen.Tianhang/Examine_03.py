@@ -1,7 +1,7 @@
 """
 This is a script for dividing the impact zone that generates different dust storms detected by WISPR-Inner.
 The 03 code is based on the projective transformation theory with the assumption that streaks are from impact-generated
-debris, not primary dusts.
+debris, not primary dusts. And this code produces the figure of impact regions of the whole PSP Encounter 7.
 This examination is just geometry analysis. Optics is not considered.
 By 2022.8.10, Tianhang Chen
 """
