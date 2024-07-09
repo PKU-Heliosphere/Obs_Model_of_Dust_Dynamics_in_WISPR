@@ -214,7 +214,7 @@ def scattering_intensity_6(elongation, width, d_to_obs, velocity, obs_time, time
         :param elongation: the elongation (unit: degree)
         :param width: the width of the streak (unit: pixel)
         :param d_to_obs: the distance from particle to observer (unit: m)
-        :param velocity: the velocity of particle (unit: m/s)
+        :param velocity: [1*3 ndarray]the velocity of particle (unit: m/s) in camera frame(i.e. WISPR-Inner frame)
         :param obs_time: the observing time of the map
         :param time_format: time string's format
         :return: the scattering intensity (unit: MSB)
@@ -245,9 +245,10 @@ def scattering_intensity_6(elongation, width, d_to_obs, velocity, obs_time, time
     # i_2 = s_2.real ** 2 + s_2.imag ** 2
     # sigma = wavelength ** 2 / 8 / np.pi ** 2 * (i_1 + i_2)
         the_irradiance = spectrum(wavelength[fun_i])
+        max_speed = np.maximum(np.abs(velocity[0]), np.abs(velocity[1]))
         intensity_W = sigma * the_irradiance * R_s**2 / r_to_SUN**2 * A_aperture / d_to_obs**2
         # photon_num = photon_num + intensity_W * 10e-6 * d_to_obs / f / velocity / h / c_0 * wavelength[fun_i]
-        photon_num = photon_num + intensity_W * 10e-6 * d_to_obs / f / velocity / h / c_0 * wavelength[fun_i]
+        photon_num = photon_num + intensity_W * 10e-6 * d_to_obs / f / max_speed / h / c_0 * wavelength[fun_i]
     total_electron_num = photon_num * qe_transmission
     intensity_DN = total_electron_num / 2.716
     intensity_MSB = intensity_DN / 48.64 * 3.93e-14

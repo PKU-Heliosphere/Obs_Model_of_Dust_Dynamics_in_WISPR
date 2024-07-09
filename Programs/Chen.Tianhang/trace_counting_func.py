@@ -1,8 +1,8 @@
 """
-This code includes functions needed in the counting programme to transform the information of streak. 
+This code includes functions needed in the counting programme.
 """
 
-from sunpy.io import fits
+from sunpy.io import read_file
 import sklearn.cluster as cluster
 import sunpy.map
 import matplotlib.pyplot as plt
@@ -53,7 +53,8 @@ def get_centroid(data_point, need_test=False):
     return vanish_point
 
 
-def get_point_slope(line_number, the_path='INPUT_path'):
+def get_point_slope(line_number, the_path='D://Microsoft Download/Formal Files/data file/FITS/WISPR_ENC07_L3_FITS/\
+20210112/psp_L3_wispr_20210112T030017_V1_1221.fits'):
     """
     NOTE: 取点顺序一定要从左到右
     :param line_number: the number of the traces gotten from the WISPR-INNER map.
@@ -65,7 +66,7 @@ def get_point_slope(line_number, the_path='INPUT_path'):
              slope_and_intercept: the slopes and intercepts of every trace(n * 2 ndarray)
              line_number: number of traces.
     """
-    data, header = fits.read(the_path)[0]
+    data, header = read_file(the_path, 'fits')[0]
     header['BUNIT'] = 'MSB'
     a_map = sunpy.map.Map(data, header)
     my_colormap = copy.deepcopy(a_map.cmap)
@@ -201,21 +202,20 @@ def DBSCAN_cluster(k_and_b, line_number):
     return all_centroids, line_label, num_centroids
 
 
-def get_max_value(data_array, pixel_x, pixel_y, scale=2):
+def get_median_value(data_array, pixel_x, pixel_y, scale=2):
     """
     :param data_array: 960*1024 ndarray
     :param pixel_x: int, coordinate of axis x corresponding to axis 1 of the data_array
     :param pixel_y: int, coordinate of axis y corresponding to axis 0 of the data_array
-    :param scale: int, the scale to get the max value in the y axis( (pixel_y - scale) to (pixel_y + scale) )
-    :return: the max value of the given position
+    :param scale: int, the scale to get the median value in the y axis( (pixel_y - scale) to (pixel_y + scale) )
+    :return: the median value of the given position
     """
     i = -scale
-    value_max = data_array[pixel_y, pixel_x]
-    while i < scale + 1:
-        if data_array[pixel_y + i, pixel_x] != 'nan' and 0 <= pixel_y < 1024*2:
-            value_max = max(value_max, data_array[pixel_y + i, pixel_x])
-        i = i + 1
-    return value_max
+    value_median = data_array[pixel_y, pixel_x]
+    y_min = pixel_y - scale
+    y_max = pixel_y + scale + 1
+    value_median = np.median(data_array[y_min:y_max, pixel_x])
+    return value_median
 
 
 def intensity_plotting(data_array, point_set, k_and_b, line_number):
@@ -238,7 +238,7 @@ def intensity_plotting(data_array, point_set, k_and_b, line_number):
         for pos_x in np.linspace(start_point, end_point):
             pos_x = int(pos_x)
             pos_y = int(k_and_b[i, 0] * pos_x + k_and_b[i, 1])
-            intensity_temp = get_max_value(data_array, pos_x, pos_y)
+            intensity_temp = get_median_value(data_array, pos_x, pos_y)
             intensity_value.append(intensity_temp)
 
         intensity_value = np.array(intensity_value, dtype=float)
@@ -316,8 +316,8 @@ def width_calc(data_array, point_set, line_number):
 
 
 def write_txt(my_time, trace_number, point_set, intensities):
-    filedir_path = 'OUTPUT_folder_path'
-    temp_file = open(filedir_path+'filename', mode='w+')
+    filedir_path = 'D://Microsoft Download/Formal Files/data file/TXT_or_XLS/WISPR dust traces/'
+    temp_file = open('D://Microsoft Download/Formal Files/data file/TXT_or_XLS/WISPR dust traces/1.txt', mode='w+')
     temp_file.write('The observing time of the WISPR map is(beginning time):\n' + my_time)
     temp_file.write('\n\n')
     temp_file.write('Number of traces is:      ' + str(trace_number) + '\n\n')
